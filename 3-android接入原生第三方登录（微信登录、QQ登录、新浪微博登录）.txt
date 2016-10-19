@@ -1,0 +1,370 @@
+[摘要：第一步：往对应的仄台上注册app的相干疑息，那一步，可参考我的别的一个篇，闭于接进亲减通讯云的文章 各个仄台注册运用疑息的地点以下： 新浪微专 ]
+
+第一步：去对应的平台上注册app的相关信息，这一步，可参考我的另外一个篇，关于接入亲加通信云的文章
+
+    各个平台注册应用信息的地址如下：
+               新浪微博                 http://open.weibo.com
+               腾讯微博                 http://dev.t.qq.com
+               QQ空间                      http://connect.qq.com/intro/login/
+               微信好友                 http://open.weixin.qq.com
+               Facebook      https://developers.facebook.com
+               Twitter       https://dev.twitter.com
+               人人网                      http://dev.renren.com
+               开心网                      http://open.kaixin001.com
+               搜狐微博                 http://open.t.sohu.com
+               网易微博                 http://open.t.163.com
+               豆瓣                           http://developers.douban.com
+               有道云笔记            http://note.youdao.com/open/developguide.html#app
+               印象笔记                 https://dev.evernote.com/
+               Linkedin      https://www.linkedin.com/secure/developer?newapp=
+               FourSquare    https://developer.foursquare.com/
+               搜狐随身看            https://open.sohu.com/
+               Flickr        http://www.flickr.com/services/
+               Pinterest     http://developers.pinterest.com/
+               Tumblr        http://www.tumblr.com/developers
+               Dropbox       https://www.dropbox.com/developers
+               Instagram     http://instagram.com/developer#
+               VKontakte     http://vk.com/dev
+
+
+新浪微博登录：
+
+主要流程：APP客户端发起登录，会回调在WeiboAuthListener 当中，在这里面我们可以得到UID（身份唯一标识），得到UID之后，再通过UsersAPI.show(UID,RequestListener )来得到用户的信息，回调在RequestListener 当中。
+
+有些手机没有安装新浪微博客户端，有些则安装了客户端，所以为了统一，我这里采用的是没有安装客户端的代码，通过非SSO授权登录
+1. 官网注册Appkey  （下载jar包，新浪微博的为一个WeiboSDK的工程）
+2、配置XML：在MainFest文件中加入以下代码片段
+
+<!-- 微博 -->
+
+
+        <!-- 必须注册在微博授权，分享微博时候用到 -->
+        <activity
+            android:name= "com.sina.weibo.sdk.component.WeiboSdkBrowser"
+            android:configChanges= "keyboardHidden|orientation"
+            android:exported= "false"
+            android:windowSoftInputMode="adjustResize" >
+        </activity >
+
+        <service
+            android:name= "com.sina.weibo.sdk.net.DownloadService"
+            android:exported= "false" >
+        </service >
+3、java代码中登录
+//注册成功之后的APPKEY
+      public static final String SINA_APPKEY = "2651314935";
+     //注册成功之后的REDIRECT_URL
+      public static final String SINA_REDIRECT_URL = "https://api.weibo.com/oauth2/default.html" ;
+      public static final String SINA_SCOPE = "all";
+         /** 注意：SsoHandler 仅当 SDK 支持 SSO 时有效 */
+      private SsoHandler mSsoHandler;
+      private AuthInfo mAuthInfo;
+      private Oauth2AccessToken mAccessToken;
+
+      mAuthInfo = new AuthInfo(LoginActivity. this,
+                              APPConstants. SINA_APPKEY, APPConstants.SINA_REDIRECT_URL ,
+                              APPConstants. SINA_SCOPE);
+                   mSsoHandler = new SsoHandler(LoginActivity. this, mAuthInfo);
+                   mSsoHandler.authorize( new AuthListener());
+
+
+
+      /******************************** 微博回调 ***********************************************/
+      /**
+       * 微博认证授权回调类。 1. SSO 授权时，需要在 {@link #onActivityResult} 中调用
+       * {@link SsoHandler#authorizeCallBack} 后， 该回调才会被执行。 2. 非 SSO
+       * 授权时，当授权结束后，该回调就会被执行。 当授权成功后，请保存该 access_token、expires_in、uid 等信息到
+       * SharedPreferences 中。
+       */
+      public class AuthListener implements WeiboAuthListener {
+
+             @Override
+             public void onComplete(Bundle values) {
+                   // 从 Bundle 中解析 Token
+                   mAccessToken = Oauth2AccessToken.parseAccessToken(values);
+                   if ( mAccessToken.isSessionValid()) {
+                        MyProgressDialog. showDialogWithFalse(LoginActivity.this, "登陆",
+                                     "正在获取用户信息" );
+                         thirdUser = new ThirdUserInfo();
+                         thirdUser.setThirdID( mAccessToken.getUid());  //mAccessToken.getUid() ，获取到UID，作为身份的唯一标示
+                        UsersAPI mUsersAPI = new UsersAPI(LoginActivity.this,APPConstants.SINA_APPKEY , mAccessToken );
+                         long uid = Long.parseLong(mAccessToken.getUid());
+                        mUsersAPI.show(uid, mListener); //获取用户基本信息
+                  } else {
+                         // 以下几种情况，您会收到 Code：
+                         // 1. 当您未在平台上注册的应用程序的包名与签名时；
+                         // 2. 当您注册的应用程序包名与签名不正确时；
+                         // 3. 当您在平台上注册的包名和签名与您当前测试的应用的包名和签名不匹配时。
+                         // String code = values.getString("code");
+                  }
+            }
+
+             @Override
+             public void onCancel() {
+            }
+
+             @Override
+             public void onWeiboException(WeiboException e) {
+
+            }
+      }
+
+//获取用户信息的回调
+      private RequestListener mListener = new RequestListener() {
+             @Override
+             public void onComplete(String response) {
+                   if (!TextUtils. isEmpty(response)) {
+                         // 调用 User#parse 将JSON串解析成User对象，所有的用户信息全部在这里面
+                        User user = User. parse(response);
+                         thirdUser.setNickName(user. name); // 昵称
+                         thirdUser.setIcon(user. avatar_hd); // 头像
+                         thirdUser.setGender(user. gender.equals( "m") ? "男" : "女" );
+                        ThirdUserVerify. verifyUser(LoginActivity.this, thirdUser, 2);
+                  }
+            }
+
+             @Override
+             public void onWeiboException(WeiboException e) {
+                  MyProgressDialog. closeDialog();
+                  ErrorInfo info = ErrorInfo. parse(e.getMessage());
+                  ToastUtil. showShort(LoginActivity.this, info.toString());
+            }
+      };
+
+      @Override
+      protected void onActivityResult( int requestCode, int resultCode, Intent data) {
+             super.onActivityResult(requestCode, resultCode, data);
+             if ( mSsoHandler != null) {
+                   mSsoHandler.authorizeCallBack(requestCode, resultCode, data);
+            }
+      }
+
+微信登录
+
+先说一下主主要流程：客户端发起登录--在WXEntryActivity的onResp(BaseResp arg0)方法中进行回调，会得到一个code.通过这个code调用一个接口获取到token和OpenID的值，之后再通过token以及openID调用获取用户信息的接口-来获取用户的数据
+
+
+1、注册APPKEY
+2、配置xml文件，在MainFest文件中添加以下代码：
+<!-- 因为微信的回调是必须写一个wxapi.WXEntryActivity的类。回调在此类，前面的包名为项目的包名-->
+        <activity
+            android:name= "com.spapa.papapaiming.wxapi.WXEntryActivity"
+            android:exported= "true" />
+
+3、发起登陆 (我在我的application类中，定义了一个static 的 IWXAPI)
+
+  BaseApplication. mIwapi = WXAPIFactory.createWXAPI( LoginActivity. this, APPConstants.WX_APPID, true );
+                  BaseApplication. mIwapi.registerApp(APPConstants. WX_APPID);
+                  SendAuth.Req req = new SendAuth.Req();
+                  req. scope = "snsapi_userinfo";
+                  req. state = "wechat_sdk_demo_test";
+                  BaseApplication. mIwapi.sendReq(req);//执行完毕这句话之后，会在WXEntryActivity回调
+4.WXEntryActivity类(回调类)
+public class WXEntryActivity extends Activity implements IWXAPIEventHandler {
+      private Bundle bundle;
+      //这个实体类是我自定义的实体类，用来保存第三方的数据的实体类
+      private ThirdUserInfo info= null;
+      @Override
+      protected void onCreate(Bundle savedInstanceState) {
+             super.onCreate(savedInstanceState);
+            AppManager. getAppManager().addActivity(WXEntryActivity. this);
+            BaseApplication. mIwapi.handleIntent(getIntent(), WXEntryActivity.this);  //必须调用此句话
+      }
+
+      @Override
+      protected void onNewIntent(Intent intent) {
+             super.onNewIntent(intent);
+            BaseApplication. mIwapi.handleIntent(intent, WXEntryActivity.this);//必须调用此句话
+      }
+
+      @Override
+      public void onReq(BaseReq req) {
+            System. out.println();
+      }
+
+
+
+      /**
+      * Title: onResp
+      *
+      *           API：https://open.weixin.qq.com/ cgi- bin/showdocument ?action=dir_list&t=resource/res_list&verify=1&id=open1419317853 &lang=zh_CN
+      * Description:在此处得到Code之后调用https://api.weixin.qq.com/sns/oauth2/access_token?appid=APPID&secret=SECRET&code=CODE&grant_type=authorization_code
+      *  获取到token和openID。之后再调用https://api.weixin.qq.com/sns/userinfo?access_token=ACCESS_TOKEN&openid=OPENID 获取用户个人信息
+      *
+      * @param arg0
+      * @see com.tencent.mm.sdk.openapi.IWXAPIEventHandler#onResp(com.tencent.mm.sdk.openapi.BaseResp)
+       */
+      @Override
+      public void onResp(BaseResp arg0) {
+             bundle=getIntent().getExtras();
+            SendAuth.Resp resp = new SendAuth.Resp( bundle);
+          //获取到code之后，需要调用接口获取到access_token
+             if (resp. errCode == BaseResp.ErrCode. ERR_OK) {
+                  String code = resp. token;
+                   if(BaseApplication. isWxLogin){
+                        getToken(code);
+                  } else{
+                        WXEntryActivity. this.finish();
+                  }
+            } else{
+                  WXEntryActivity. this.finish();
+            }
+
+      }
+          //这个方法会取得accesstoken  和openID
+      private void getToken(String code){
+            MyProgressDialog. showDialog(WXEntryActivity.this, "登陆", "正在获取用户信息" );
+            HttpBase. get("https://api.weixin.qq.com/sns/oauth2/access_token?appid=wxd7673d08f6c1963d&secret=223d726f966031f30125d0e4e7d4aed3&code=" +code+"&grant_type=authorization_code" , new JsonHttpResponseHandler(){
+                   @Override
+                   public void onSuccess( int statusCode, JSONObject response) {
+                         super.onSuccess(statusCode, response);
+                         info = new ThirdUserInfo();
+                         info.setThirdID(response.optString( "openid"));
+                        getUserInfo(response.optString( "access_token"),response.optString( "openid"));
+                  }
+                   @Override
+                   public void onFailure( int statusCode, Throwable e,
+                              JSONObject errorResponse) {
+                         // TODO Auto-generated method stub
+                         super.onFailure(statusCode, e, errorResponse);
+                        MyProgressDialog. closeDialog();
+                        HttpBase. onFailureTips(WXEntryActivity.this, errorResponse);
+                  }
+            });
+      }
+
+          //获取到token和openID之后，调用此接口得到身份信息
+      private void getUserInfo(String token,String openID){
+            HttpBase. get("https://api.weixin.qq.com/sns/userinfo?access_token=" +token+"&openid=" +openID, new JsonHttpResponseHandler(){
+                   @Override
+                   public void onSuccess( int statusCode, JSONObject response) {
+                         super.onSuccess(statusCode, response);
+                         info.setNickName(response.optString( "nickname"));
+                         info.setGender(response.optInt( "sex")==1? "男": "女");
+                         info.setIcon(response.optString( "headimgurl"));
+                        ThirdUserVerify. verifyUser(WXEntryActivity.this, info, 3);
+//                      AppManager.getAppManager().finishActivity(LoginActivity.class);
+                  }
+                   @Override
+                   public void onFailure( int statusCode, Throwable e,
+                              JSONObject errorResponse) {
+                         super.onFailure(statusCode, e, errorResponse);
+                        MyProgressDialog. closeDialog();
+                        HttpBase. onFailureTips(WXEntryActivity.this, errorResponse);
+                  }
+            });
+      }
+}
+
+QQ登录
+
+1、注册APPKEY
+2、配置xml文件：
+
+ <!-- QQ -->
+        <activity
+            android:name= "com.tencent.tauth.AuthActivity"
+            android:launchMode= "singleTask"
+            android:noHistory= "true" >
+            <intent-filter >
+                <action android:name ="android.intent.action.VIEW" />
+
+                <category android:name ="android.intent.category.DEFAULT" />
+                <category android:name= "android.intent.category.BROWSABLE" />
+
+                <data android:scheme ="1104406273" />
+            </intent-filter >
+        </activity >
+        <activity
+            android:name= "com.tencent.connect.common.AssistActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:theme= "@android:style/Theme.Translucent.NoTitleBar" />
+
+</pre><pre name="code" class="java">        public Tencent mTencent = Tencent.createInstance(APPConstants. QQ_APPID,LoginActivity.this);  初始化Tencent
+
+      mTencent.login(LoginActivity. this, "all", new IUiListener() { // QQ发起登陆
+
+                               @Override
+                               public void onCancel() {
+
+                              }
+
+                               @Override
+                               public void onComplete(Object arg0) {   //登陆成功的回调，在此处可以获取用户信息
+                                    MyProgressDialog. showDialogWithFalse(LoginActivity.this, "登陆", "正在获取用户信息" );
+                                    initOpenidAndToken((JSONObject) arg0);
+                                    updateUserInfo();
+                              }
+
+                               @Override
+                               public void onError(UiError arg0) {
+
+                              }
+
+                        });
+
+/**
+       * @Title: initOpenidAndToken
+       * @Description: 初始化OPENID以及TOKEN身份验证。
+       * @param @param jsonObject
+       * @return void
+       * @throws
+       */
+      private void initOpenidAndToken (JSONObject jsonObject) {
+             thirdUser = new ThirdUserInfo();
+             try {
+                  //这里的Constants类，是 com.tencent.connect.common.Constants类，下面的几个参数也是固定的
+                  String token = jsonObject.getString(Constants.PARAM_ACCESS_TOKEN );
+                  String expires = jsonObject.getString(Constants.PARAM_EXPIRES_IN );
+                  String openId = jsonObject.getString(Constants.PARAM_OPEN_ID );  //OPENID,作为唯一身份标识
+                   if (!TextUtils. isEmpty(token) && !TextUtils.isEmpty(expires)&& !TextUtils. isEmpty(openId)) {
+                    //设置身份的token
+                         mTencent.setAccessToken(token, expires);
+                         mTencent.setOpenId(openId);
+                         thirdUser.setThirdID(openId);
+                  }
+                  } catch (Exception e) {
+            }
+      }
+
+      /**
+       * @Title: updateUserInfo
+       * @Description: 在回调里面可以获取用户信息数据了
+       * @param
+       * @return void
+       * @throws
+       */
+      private void updateUserInfo() {
+             if ( mTencent != null && mTencent.isSessionValid()) {
+                   UserInfo mInfo = new UserInfo(LoginActivity. this,  mTencent.getQQToken());
+                  mInfo.getUserInfo(listener);
+                  IUiListener listener = new IUiListener() {
+
+                         @Override
+                         public void onError(UiError e) {
+                              MyProgressDialog. closeDialog();
+                        }
+
+                         // 用户的信息回调在此处
+                         @Override
+                         public void onComplete( final Object response) {
+                               // 返回Bitmap对象。
+                               try {
+                                    JSONObject obj = new JSONObject(response.toString());
+                                     thirdUser.setNickName(obj.optString( "nickname"));
+                                     thirdUser.setIcon(obj.optString( "figureurl_qq_2"));
+                                     thirdUser.setGender(obj.optString( "gender"));
+                                    ThirdUserVerify. verifyUser(LoginActivity.this,thirdUser, 1);
+                              } catch (JSONException e) {
+                                    e.printStackTrace();
+                              }
+                        }
+
+                         @Override
+                         public void onCancel() {
+                              MyProgressDialog. closeDialog();
+                        }
+                  };
+
+            }
+      }

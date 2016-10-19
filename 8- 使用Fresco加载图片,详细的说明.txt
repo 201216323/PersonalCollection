@@ -1,0 +1,293 @@
+ 使用Fresco加载图片
+http://blog.csdn.net/mockingbirds/article/details/50658846
+
+Fresco是facebook推出的一款强大的图片加载的框架,我们都知道，在手机上，每一个像素的R、G、B和alpha通道总共要占用4byte的空间，而Fresco可以最大限度节省空间和CPU时间，它含有3级缓存设计（2级内存，1级文件）。
+fresco源码
+
+Fresco的优势和特性:
+
+1   Fresco含有3级缓存设计，包括2级内存和1级文件及缓存
+2   通过Drawees 模块，可以方便地显示loading图，当图片不再显示在屏幕上时，及时地释放内存和空间占用
+3   支持 Android2.3(API level 9) 及其以上系统
+Fresco简单使用
+
+在项目中的module中的build.gradle中加入如下依赖：
+
+dependencies {
+    compile 'com.facebook.fresco:fresco:0.9.0+'
+}
+
+显示一张简单的图片
+        记得添加网络的访问权限：
+        <uses-permission android:name="android.permission.INTERNET"/>
+fresco:placeholderImage 表示loading时候的图片显示。
+代码加载图片
+    Fresco.initialize(this);
+    setContentView(R.layout.activity_main);
+    Uri uri = Uri.parse("https://raw.githubusercontent.com/facebook/fresco/gh-pages/static/fresco-logo.png");
+    SimpleDraweeView draweeView = (SimpleDraweeView) findViewById(R.id.draweeview);
+    draweeView.setImageURI(uri);
+这里需要注意的是Fresco.initialize(this);需要在setContentView方法调用之前就进行初始化操作。 上面的步骤中Fresco会自动完成如下操作：
+
+1显示占位图直到加载完成
+2下载图片
+3缓存图片
+4图片不再显示时，从内存中移除
+5可以看到上面我们使用了setImageURI来设置图片的路径，Fresco 支持一下URI格式
+
+类型	            Scheme	                    示例
+远程图片	        http://, https://	        HttpURLConnection
+本地文件	        file://	                    FileInputStream
+Content provider	content://	                ContentResolver
+asset目录下的资源	asset://	                AssetManager
+res目录下的资源	    res://	                    Resources.openRawResource
+需要注意的是：Fresco中所有的URI都必须是绝对路径，并且带上该URI的scheme
+例如，要显示res/drawable下的一张图片可以使用下面的方式：
+Uri uri = Uri.parse("res://sadf/"+R.drawable.pic);
+上面的额”sadf”可以使用随意的字符串，不过还是建议使用包名来书写。
+
+使用DraweeController 加载图片
+
+另外，我们还可以使用DraweeController 来加载图片，如下：
+DraweeController controller = Fresco.newDraweeControllerBuilder()
+      .setUri(uri)
+      .setOldController(mSimpleDraweeView.getController())
+      .build();
+draweeView.setController(controller);
+// 这里在指定一个新的controller的时候，使用setOldController，可以节省内存分配
+
+监听图片加载
+
+另外可以通过为DraweeController 设置一个ControllerListener 来监听图片的加载情况，进而做进一步处理：
+
+ControllerListener controllerListener = new BaseControllerListener() {
+
+            @Override
+            public void onIntermediateImageFailed(String id, Throwable throwable) {
+                super.onIntermediateImageFailed(id, throwable);
+                // 设置图片为渐进式的时候，加载失败，会执行onIntermediateImageFailed方法
+            }
+
+            @Override
+            public void onFailure(String id, Throwable throwable) {
+                super.onFailure(id, throwable);
+                // 图片加载失败时候，会执行onFailure方法
+            }
+
+            @Override
+            public void onSubmit(String id, Object callerContext) {
+                super.onSubmit(id, callerContext);
+            }
+
+            @Override
+            public void onFinalImageSet(String id, Object imageInfo, Animatable animatable) {
+                super.onFinalImageSet(id, imageInfo, animatable);
+                // 图片加载成功时候会执行onFinalImageSet方法
+            }
+        };
+
+DraweeController controller = Fresco.newDraweeControllerBuilder()
+                .setUri(uri)
+                .setControllerListener(controllerListener)
+                .build();
+draweeView.setController(controller);
+
+Drawees的属性配置
+
+使用drawees来加载图片必须声明 Android:layout_width 和 android:layout_height，并且Drawees 不支持 wrap_content 属性，但是如果是指定宽高比，就可是使用wrap_content 属性，例如
+
+<com.facebook.drawee.view.SimpleDraweeView
+        android:id="@+id/draweeview"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        fresco:placeholderImage="@drawable/ic_launcher"
+        fresco:viewAspectRatio="0.5"
+        />
+==================================
+// 也可以使用代码指定：
+draweeView.setAspectRatio(0.5f);
+
+drawee支持如下属性：
+fresco:fadeDuration="300" // 淡入淡出的持续时间
+fresco:actualImageScaleType="focusCrop"  // 实际图像的缩放类型
+fresco:placeholderImage="@color/wait_color"  //占位图
+fresco:placeholderImageScaleType="fitCenter" //占位图的缩放类型
+fresco:failureImage="@drawable/error" //下载失败显示的图片
+fresco:failureImageScaleType="centerInside" //失败图的缩放类型
+fresco:retryImage="@drawable/retrying"
+//图片加载失败时显示，提示用户点击重新加载，重复加载4次还是没有加载出来的时候才会显示failureImage的图片
+fresco:retryImageScaleType="centerCrop" //重新加载的图片缩放类型
+fresco:progressBarImage="@drawable/progress_bar" //进度条图片
+fresco:progressBarImageScaleType="centerInside"
+fresco:progressBarAutoRotateInterval="1000"
+//进度图自动旋转间隔时间(单位：毫秒ms)
+fresco:backgroundImage="@color/blue"
+//背景图片，这里的背景图片首先被绘制
+fresco:overlayImage="@drawable/watermark"
+// 设置叠加图，在xml中只能设置一张叠加图片，如果需要多张图片的话，需要在java代码中设置哦
+fresco:pressedStateOverlayImage="@color/red"
+// 设置点击状态下的叠加图
+fresco:roundAsCircle="false" //设置为圆形图
+fresco:roundedCornerRadius="1dp" // 圆角半径
+fresco:roundTopLeft="true" // 左上角是否为圆角
+fresco:roundTopRight="false"
+fresco:roundBottomLeft="false"
+fresco:roundBottomRight="true"
+fresco:roundWithOverlayColor="@color/corner_color"
+fresco:roundingBorderWidth="2dp" //边框的宽度
+fresco:roundingBorderColor="@color/border_color" //边框颜色
+
+
+上面的ImageScaleType有下面一些缩放类型：
+
+类型	                                                                    描述
+center	                                            居中，无缩放
+centerCrop	                保持宽高比缩小或放大，使得两边都大于或等于显示边界，且宽或高契合显示边界。居中显示
+focusCrop	                同centerCrop, 但居中点不是中点，而是指定的某个点
+centerInside	            缩放图片使两边都在显示边界内，居中显示。和 fitCenter 不同，不会对图片进行放大。如果图尺寸大于显示边界，则保持长宽比缩小图片。
+fitCenter	                保持宽高比，缩小或者放大，使得图片完全显示在显示边界内，且宽或高契合显示边界。居中显示。
+fitStart	                同上。但不居中，和显示边界左上对齐
+fitEnd	                    同fitCenter， 但不居中，和显示边界右下对齐
+fitXY	                    不保存宽高比，填充满显示边界
+none	                    如要使用tile mode显示, 需要设置为none
+
+在代码中使用Drawees
+
+一般，我们在xml中通过上面的属性配置图片的显示方式，同样可以在代码中更加灵活的配置：
+
+GenericDraweeHierarchy hierarchy = builder
+                .setFadeDuration(300) //设置渐显和消失的时间
+                .setPlaceholderImage(drawable) //设置loading图片
+                .build();
+draweeView.setHierarchy(hierarchy);
+
+
+在代码中动态改变显示的样式
+// 获取一个GenericDraweeHierarchy
+GenericDraweeHierarchy hierarchy = draweeView.getHierarchy();
+// 动态改变loading图片
+draweeHierarchy.setPlaceholderImage(R.color.colorAccent);
+
+RoundingParams roundingParams = draweeHierarchy.getRoundingParams();
+// 这里如果在xml里没有设置相关属性，getRoundingParams()就是null，不过可以new一个
+
+// RoundingParams roundingParams = new RoundingParams();
+
+// 设置边框颜色和宽度        roundingParams.setBorder(Color.parseColor("#ff4789"),30.0f);
+// 设置圆角半径
+roundingParams.setCornersRadius(50.0f);
+draweeHierarchy.setRoundingParams(roundingParams);
+
+// 另外也可以显示圆形图片，一行代码就可以了
+roundingParams.setRoundAsCircle(true);
+
+多图请求
+
+有时候需要加载很多图片，这个时候如果网络情况不是很好的情况下，一直显示占位图，体验也不是很好，我们可以先显示一个低分辨率的图片，等到大图加载完成之后，在显示真正的图片。
+
+DraweeController controller = Fresco.newDraweeControllerBuilder()
+    .setLowResImageRequest(ImageRequest.fromUri(lowResUri))
+    .setImageRequest(ImageRequest.fromUri(highResUri))
+    .setOldController(draweeView.getController())
+    .build();
+draweeView.setController(controller);
+上面设置了两个Uri，分别是分辨率较小和大分辨率的图片。
+
+缩略图显示
+可以使用下面的代码实现缩略图的显示：
+ImageRequest request = ImageRequestBuilder.newBuilderWithSource(uri)
+    .setLocalThumbnailPreviewsEnabled(true)
+    .build();
+
+DraweeController controller = Fresco.newDraweeControllerBuilder()
+    .setImageRequest(request)
+    .setOldController(draweeView.getController())
+    .build();
+draweeView.setController(controller);
+上面的代码，通过setLocalThumbnailPreviewsEnabled设置可以先显示缩略图，会在本地缓存中查找可以显示的缩略图，完整的清晰大图在加载完之后再显示
+
+
+渐进式图片显示
+ImageRequest request = ImageRequestBuilder
+                .newBuilderWithSource(uri)
+                .setProgressiveRenderingEnabled(true)
+                .build();
+PipelineDraweeController controller = (PipelineDraweeController) Fresco.newDraweeControllerBuilder()
+                .setImageRequest(request)
+                .setOldController(draweeView.getController())
+                .build();
+
+draweeView.setController(controller);
+Image Pipeline
+
+Image pipeline 负责完成加载图像。
+图片：8-1
+
+配置Pipeline
+我们可以根据自己的需要来配置Pipeline 从而实现不同的加载需求
+ImagePipelineConfig config = ImagePipelineConfig.newBuilder()
+    .setBitmapMemoryCacheParamsSupplier(bitmapCacheParamsSupplier)
+    .setCacheKeyFactory(cacheKeyFactory)
+    .setEncodedMemoryCacheParamsSupplier(encodedCacheParamsSupplier)
+    .setExecutorSupplier(executorSupplier)
+    .setImageCacheStatsTracker(imageCacheStatsTracker)
+    .setMainDiskCacheConfig(mainDiskCacheConfig)
+    .setMemoryTrimmableRegistry(memoryTrimmableRegistry)
+    .setNetworkFetchProducer(networkFetchProducer)
+    .setPoolFactory(poolFactory)
+    .setProgressiveJpegConfig(progressiveJpegConfig)
+    .setRequestListeners(requestListeners)
+    .setSmallImageDiskCacheConfig(smallImageDiskCacheConfig)
+    .build();
+Fresco.initialize(context, config);
+以上是所有的配置，可以根据需要进行不同配置。
+
+检查图片是否在内存缓存中
+ImagePipeline imagePipeline = Fresco.getImagePipeline(); Uri uri;
+boolean inMemoryCache = imagePipeline.isInBitmapMemoryCache(uri);
+
+检查图片是否在文件缓存中
+ImagePipeline imagePipeline = Fresco.getImagePipeline();
+        DataSource<Boolean> inDiskCacheSource = imagePipeline.isInDiskCache(uri);
+        DataSubscriber<Boolean> subscriber = new BaseDataSubscriber<Boolean>() {
+            @Override
+            protected void onNewResultImpl(DataSource<Boolean> dataSource) {
+                if (!dataSource.isFinished()) {
+                    return;
+                }
+                boolean isInCache = dataSource.getResult();
+            }
+
+            @Override
+            protected void onFailureImpl(DataSource<Boolean> dataSource) {
+
+            }
+        };
+
+删除缓存中的Uri
+ImagePipeline imagePipeline = Fresco.getImagePipeline();
+Uri uri;
+// 从内存中删除
+imagePipeline.evictFromMemoryCache(uri);
+// 从磁盘中删除
+imagePipeline.evictFromDiskCache(uri);
+
+// 同时从文件和磁盘中删除当前uri的缓存
+imagePipeline.evictFromCache(uri);
+
+清除所有缓存
+ImagePipeline imagePipeline = Fresco.getImagePipeline();
+imagePipeline.clearMemoryCaches();
+imagePipeline.clearDiskCaches();
+// 同时清除内存和磁盘缓存
+imagePipeline.clearCaches();
+
+
+
+
+
+
+
+
+
+

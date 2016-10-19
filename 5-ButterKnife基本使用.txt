@@ -1,0 +1,237 @@
+ButterKnife基本使用
+Butter Knife处理字段和方法绑定.
+
+重要更新: 目前(2016.4.29), ButterKnife的最新版本是8.0.1.
+Demo项目已更新: https://github.com/mengdd/AndroidButterKnifeSample
+以下原文是针对ButterKnife v6.1.0的, v8.0.1主要的不同在以下几个关键词:
+
+@InjectView -> @BindView
+@InjectViews -> @BindViews
+ButterKnife.inject(this) -> ButterKnife.bind(this)
+
+
+ButterKnife.reset(this) ->
+
+private Unbinder unbinder;
+unbinder = ButterKnife.bind(this, view);
+@Override
+public void onDestroyView() {
+    unbinder.unbind();
+    super.onDestroyView();
+}
+
+配置:
+	用gradle配置的时候加入:
+	compile 'com.jakewharton:butterknife:6.1.0' 注意是加在Module: app的gradle文件中.
+	apply plugin: 'android-apt'
+	项目dependencies中添加classpath 'com.neenbedankt.gradle.plugins:android-apt:1.8'
+
+加上之后不用运行什么命令,直接Sync一下就可以在External Libraries里面看到butterknife.
+
+功能1: 再也不用写findViewById()啦.
+以前的:
+mTextView1 = (TextView) findViewById(R.id.butter_text_view_1);
+现在可以这样实现:
+首先在变量声明的时候加上注解:
+@InjectView(R.id.butter_text_view_2)
+TextView mTextView2;
+如果id找不到,会在编译的时候报错.
+
+之后在设置好布局之后调用ButterKnife.inject():
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.demo_butter_knife);
+
+    //using butter knife
+    ButterKnife.inject(this);
+}
+
+之后View对象就可以直接使用了.
+
+需要注意的是View变量声明的时候不能为private或者static.
+除了Activity之外,你可以提供其他的View Root,来获取对象(执行注入).
+还可以用来简化Adapter里面的ViewHolder:
+
+ButterKnife in Fragment
+在Fragment中也可以使用ButterKnife来获取View:
+
+public class SimpleFragment extends Fragment {
+
+    @InjectView(R.id.fragment_text_view)
+    TextView mTextView;
+
+    public SimpleFragment() {
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_simple, container, false);
+        ButterKnife.inject(this, view);
+        mTextView.setText("TextView in Fragment are found!");
+        return view;
+    }
+}
+
+ButterKnife in Adapter ViewHolder
+
+用了ButterKnife之后, ViewHolder的使用可以变成这样:
+
+ @Override
+    public View getView(int position, View convertView, ViewGroup parent) {
+        ViewHolder holder;
+        if (convertView == null) {
+            convertView = mInflater.inflate(R.layout.person_item_layout, null);
+            holder = new ViewHolder(convertView);
+            convertView.setTag(holder);
+        } else {
+            holder = (ViewHolder) convertView.getTag();
+        }
+        Person person = getItem(position);
+        if (null != person) {
+            holder.name.setText(person.getName());
+            holder.age.setText(String.valueOf(person.getAge()));
+            holder.location.setText(person.getLocation());
+            holder.work.setText(person.getWork());
+        }
+
+        return convertView;
+    }
+
+    static class ViewHolder {
+        @InjectView(R.id.person_name)
+        TextView name;
+        @InjectView(R.id.person_age)
+        TextView age;
+        @InjectView(R.id.person_location)
+        TextView location;
+        @InjectView(R.id.person_work)
+        TextView work;
+
+        public ViewHolder(View view) {
+            ButterKnife.inject(this, view);
+        }
+    }
+
+可以看到ViewHolder类加了一个带参数View的构造方法,用注解标记每个字段,再也不需要在getView()方法里调用findViewById()方法了.
+
+功能2: 再也不用写setOnClickListener()啦.
+
+比如之前的:
+  finishButton.setOnClickListener(new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            finish();
+        }
+    });
+
+现在可以写成:
+
+@OnClick(R.id.basic_finish_a_button)
+    void finishA(View view) {
+        finish();
+    }
+
+注意这里方法仍然不能是private和static, 并且可以有一个参数View,也可不写.
+所有listener的参数都是optional的,可以写,也可以不写.
+并且写的时候可以直接写一个具体的子类,比如参数View可以写成Button,这里的cast是自动完成的.
+
+注意还是需要调用一下ButterKnife.inject(this);
+否则事件绑定不成功.
+忘记调用ButterKnife.inject(this);对于findView来说会报错,但是对于绑定事件来说不会报错,只是没有事情发生.
+
+除了点击事件@OnClick,还有ListView的点击@OnItemClick, CheckBox的@OnCheckedChanged等等.
+可以一次指定多个id,为多个View绑定一个事件处理方法,比如:
+
+//you can bind listener to multiple views
+@OnClick({R.id.button_enable, R.id.button_disable, R.id.button_alpha_0, R.id.button_alpha_1})
+void editViewsClicked() {
+    Toast.makeText(this, "You click the Button!", Toast.LENGTH_SHORT).show();
+}
+
+
+功能3: 组建View List: 把多个View放在一起用
+
+可以同时获取多个View,放在一个List中:
+
+@InjectViews({R.id.label_first_name, R.id.label_middle_name, R.id.label_last_name})
+List<TextView> labelViews;
+
+@InjectViews({R.id.first_name, R.id.middle_name, R.id.last_name})
+List<EditText> nameViews;
+
+注意id用逗号分隔,大括号包围,外面才是小括号
+
+apply()方法允许你为一组对象批量地设置值.
+apply()方法共有3种形式:
+
+public static <T extends View> void apply(List<T> list, Action<? super T> action)
+public static <T extends View, V> void apply(List<T> list, Setter<? super T, V> setter, V value)
+public static <T extends View, V> void apply(List<T> list, Property<? super T, V> setter, V value)
+
+即Action, Setter和Property三种.
+其中Action和Setter都是ButterKnife的类,需要继承,写自己的子类实现,然后传入对象.
+Setter的第三个参数可以指定要set到什么值.
+
+Property是Android中的类:https://developer.android.com/reference/android/util/Property.html
+
+具体的使用可以参见例子:
+https://github.com/mengdd/AndroidButterKnifeSample/blob/master/app/src/main/java/com/example/mengdd/butterknifesample/ViewListActivity.java
+
+
+其他实用方法
+1.注入重置(Injection Rest):
+可以用reset()方法将ButterKnife注入的View引用设置为null.
+比如在Fragment的onCreateView()里调用ButterKnife.inject()方法注入了一些View,在onDestroyView()里想把它们置为null,可以直接调用ButterKnife.reset(this);方法.
+
+2.选择性注入(Optional Injection):
+默认情况下,@InjectView和listener的注入都是必须的,如果target view没有被发现,则会报错.
+为了抑制这种行为,可以用@Optional注解来标记field和方法,让注入变成选择性的,如果targetView存在,则注入, 不存在,则什么事情都不做.
+当布局被复用时,这个@Optional注解很有用.
+
+3.多方法的listener(Multi-method Listeners):
+有一些View的listener是有多个回调方法的,比如Spinner的onItemSelectedListener:
+
+mSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+    @Override
+    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+    }
+
+    @Override
+    public void onNothingSelected(AdapterView<?> parent) {
+    }
+});
+方法注解可以用来绑定到这些方法中的任何一个.
+每一个注解有一个默认的callback,指定它绑定到什么方法上;可以通过callback参数指定为一个特定的方法.
+比如:
+没有指定callback,默认对应onItemSelected()方法:
+@OnItemSelected(R.id.my_spinner)
+    //default callback : ITEM_SELECTED
+void onItemSelected(int position) {
+    Toast.makeText(this, "position: " + position, Toast.LENGTH_SHORT).show();
+}
+
+指定了callback,对应onNothingSelected()方法:
+@OnItemSelected(value = R.id.my_spinner, callback = OnItemSelected.Callback.NOTHING_SELECTED)
+void onNothingSelected() {
+    Toast.makeText(this, "Nothing", Toast.LENGTH_SHORT).show();
+}
+
+注意的是Spinner中只要有数据,默认都会选中第0个数据,所以想进入到onNothingSelected()方法,就需要把Adapter中的数据都清空.
+具体完整例子见:
+https://github.com/mengdd/AndroidButterKnifeSample/blob/master/app/src/main/java/com/example/mengdd/butterknifesample/SpinnerActivity.java
+
+4.findById()方法
+ButterKnife.findById()可以用来获取Activity,Dialog或View中的任何View.
+ButterKnife自动完成了类型转换,所以获取出来以后不用进行显式强转,直接赋值给具体的View类型引用即可.
+
+
+Resources:
+Sample Project:
+https://github.com/mengdd/AndroidButterKnifeSample
+ 
+Introduction: http://jakewharton.github.io/butterknife/
+Java Doc: http://jakewharton.github.io/butterknife/javadoc/
+github: https://github.com/JakeWharton/butterknife
+

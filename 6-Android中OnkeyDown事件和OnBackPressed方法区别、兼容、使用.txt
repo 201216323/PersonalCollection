@@ -1,0 +1,75 @@
+Android中OnkeyDown事件和OnBackPressed方法区别、兼容、使用
+
+在Android平台上捕获Back键的事件，Back键是手机上的后退键，一般的软件不捕获相关信息可能导致你的程序被切换到后台，而回到桌面的尴尬情况，在Android上有两种方法来获取该按钮的事件。
+
+  1.直接获取按钮按下事件，此方法兼容Android 1.0到Android 2.1 也是常规方法，直接重写Activity的onKeyDown方法即可，代码如下:
+
+@Override
+public boolean onKeyDown(int keyCode, KeyEvent event)  {
+    if (keyCode == KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0) { //按下的如果是BACK，同时没有重复
+       Toast.makeText(ml78.this,"返回键Back键测试",1).show();
+        return true;
+    }
+
+    return super.onKeyDown(keyCode, event);
+}
+
+而对于Android 2.0开始又多出了一种新的方法，对于Activity 可以单独获取Back键的按下事件，直接重写onBackPressed方法即可，代码如下
+
+@Override
+public void onBackPressed() {
+// 这里处理逻辑代码，大家注意：该方法仅适用于2.0或更新版的sdk
+return;
+}
+
+
+同时还有一种情况，就是在以前开发的程序中使用的是onKeyDown方法，但是后续版本为了兼容OnBackPressed方法。就需要两者之间进行嵌套。具体的方法如下：
+
+   @Override
+   public boolean onKeyDown(int keyCode, KeyEvent event) {
+   // 是否触发按键为back键
+  if (keyCode == KeyEvent.KEYCODE_BACK) {
+   onBackPressed();
+   return true;
+   } else {// 如果不是back键正常响应
+   return super.onKeyDown(keyCode, event);
+   }
+
+  }
+
+
+利用时间差方法完成两次返回键退出，防止误操作。
+
+
+
+// 退出时间
+
+    private long currentBackPressedTime = 0;
+
+    // 退出间隔
+
+    private static finalint BACK_PRESSED_INTERVAL = 2000;
+
+     //重写onBackPressed()方法,继承自退出的方法
+
+    @Override
+
+    publicvoid onBackPressed() {
+
+    // 判断时间间隔
+
+    if (System.currentTimeMillis()- currentBackPressedTime > BACK_PRESSED_INTERVAL) {
+
+        currentBackPressedTime = System.currentTimeMillis();
+
+        Toast.makeText(this, "再按一次返回键退出程序", Toast.LENGTH_SHORT).show();
+
+    } else {
+
+        // 退出
+
+        finish();
+
+    }
+
+}
